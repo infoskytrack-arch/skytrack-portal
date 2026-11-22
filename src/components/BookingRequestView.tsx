@@ -47,10 +47,8 @@ import {
   launchSafeExternalLink,
 } from '../utils/bookingFormat';
 import { downloadOfficialRequestReceipt } from '../utils/officialReceiptGenerator';
-import {
-  compressImageFileToDataUrl,
-  createLocalBookingRequest,
-} from '../utils/localBookingStore';
+import { submitBookingRequestToCloud } from '../utils/cloudBookingStore';
+import { compressImageFileToDataUrl } from '../utils/localBookingStore';
 import {
   clearSavedPassengerProfile,
   loadSavedPassengerProfile,
@@ -70,6 +68,9 @@ export interface BookingScreenContext {
   travelClass: string;
   quota: string;
   extraPreferences?: string;
+  estimatedFare?: number;
+  availabilityStatus?: string;
+  distanceKm?: number;
   isAdvanceOpeningPriority?: boolean;
 }
 
@@ -294,7 +295,7 @@ export function BookingFormScreen({
     return null;
   }
 
-  function handleSubmit(channel: 'whatsapp' | 'email') {
+  async function handleSubmit(channel: 'whatsapp' | 'email') {
     setErrorMessage('');
     const validationErr = validateForm();
     if (validationErr) {
@@ -317,8 +318,8 @@ export function BookingFormScreen({
         email: email.trim() || undefined,
       });
 
-      // Save booking request 100% client-side in localStorage (no backend /api calls)
-      const { record } = createLocalBookingRequest({
+      // Save booking request to Firebase Firestore (and Storage for screenshots) so Admin sees it on any device
+      const record = await submitBookingRequestToCloud({
         serviceType: context.serviceType,
         trainNumber: context.trainNumber,
         trainName: context.trainName,
@@ -356,7 +357,6 @@ export function BookingFormScreen({
         deliveryChannel: channel,
       });
 
-      // Launch WhatsApp or Email synchronously inside the click handler so mobile/desktop browsers never block it
       if (channel === 'whatsapp') {
         launchSafeExternalLink(buildWhatsAppUrl(record));
       } else {
@@ -365,9 +365,16 @@ export function BookingFormScreen({
 
       onSubmitted(record);
     } catch (err) {
-      setErrorMessage(
-        err instanceof Error ? err.message : 'Something went wrong while submitting your request.'
-      );
+      let friendlyMsg = 'Something went wrong while submitting your request. Please try again.';
+      if (err instanceof Error) {
+        try {
+          const parsed = JSON.parse(err.message) as { error?: string };
+          friendlyMsg = parsed.error || err.message;
+        } catch {
+          friendlyMsg = err.message;
+        }
+      }
+      setErrorMessage(friendlyMsg);
     } finally {
       setSubmittingChannel(null);
     }
@@ -433,7 +440,22 @@ export function BookingFormScreen({
             {context.fromLabel} → {context.toLabel} · {formatReadableDate(context.journeyDate)} ·{' '}
             <span className="font-mono font-semibold">{context.travelClass}</span>
             {isTrain ? ` · ${context.quota}` : ''}
+            {context.distanceKm ? ` · ~${context.distanceKm.toLocaleString('en-IN')} km` : ''}
           </p>
+          {isTrain && (context.estimatedFare || context.availabilityStatus) && (
+            <div className="mt-2 pt-2 border-t border-white/15 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+              {context.estimatedFare && (
+                <span className="font-mono font-bold text-amber-200 tabular-nums">
+                  Est. IRCTC Fare: {formatInrAmount(context.estimatedFare)} / passenger
+                </span>
+              )}
+              {context.availabilityStatus && (
+                <span className="font-mono font-semibold text-white/95">
+                  Checked Status: {context.availabilityStatus}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <form

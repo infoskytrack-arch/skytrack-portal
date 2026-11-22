@@ -1,0 +1,508 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ============================================================
+    // Global Hardened Helpers (Phase 3)
+    // ============================================================
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidMobileId(mobile) {
+      return mobile is string && mobile.size() == 10 && mobile.matches('^[6-9][0-9]{9}$');
+    }
+
+    function isValidRefId(refId) {
+      return refId is string && refId.size() <= 32 && refId.matches('^ST-[0-9]{8}-[A-Z0-9]{4}$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedOwner() {
+      return isVerifiedUser() &&
+        request.auth.token.email in ['infoskytracktravel@gmail.com', 'infoskytrack2008@gmail.com'];
+    }
+
+    function isAdmin() {
+      return isBootstrappedOwner() ||
+        (isVerifiedUser() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    function isOptionalString(data, field, maxLen) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    function isOptionalBool(data, field) {
+      return !(field in data) || (data[field] is bool);
+    }
+
+    // ============================================================
+    // Entity Validation Blueprints (Pillar 2 — Anti-Update-Gap)
+    // ============================================================
+    function isValidBooking(data) {
+      return data.keys().hasAll([
+        'id',
+        'referenceId',
+        'createdAt',
+        'updatedAt',
+        'createdAtIso',
+        'updatedAtIso',
+        'serviceType',
+        'trainNumber',
+        'trainName',
+        'fromStation',
+        'toStation',
+        'boardingStation',
+        'journeyDate',
+        'travelClass',
+        'quota',
+        'advancePaymentChoice',
+        'advanceTokenAmount',
+        'passengers',
+        'mobile',
+        'deliveryChannel',
+        'status',
+        'hasTicketPdf'
+      ]) &&
+      data.keys().hasOnly([
+        'id',
+        'referenceId',
+        'createdAt',
+        'updatedAt',
+        'createdAtIso',
+        'updatedAtIso',
+        'serviceType',
+        'trainNumber',
+        'trainName',
+        'fromStation',
+        'toStation',
+        'boardingStation',
+        'journeyDate',
+        'returnDate',
+        'travelClass',
+        'quota',
+        'extraPreferences',
+        'allowAlternateTrain',
+        'allowClassUpgrade',
+        'isAdvanceOpeningPriority',
+        'referredBy',
+        'advancePaymentChoice',
+        'advanceTokenAmount',
+        'paymentProofMethod',
+        'hasPaymentScreenshot',
+        'paymentScreenshotOriginalName',
+        'paymentScreenshotUrl',
+        'passengers',
+        'mobile',
+        'alternatePhone',
+        'email',
+        'paymentReference',
+        'deliveryChannel',
+        'status',
+        'pnrNumber',
+        'agentRemark',
+        'hasTicketPdf',
+        'pdfOriginalName',
+        'ticketPdfUrl',
+        'ticketPdfStorage'
+      ]) &&
+      isValidId(data.id) &&
+      isValidRefId(data.referenceId) &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp &&
+      data.createdAtIso is string && data.createdAtIso.size() >= 10 && data.createdAtIso.size() <= 40 &&
+      data.updatedAtIso is string && data.updatedAtIso.size() >= 10 && data.updatedAtIso.size() <= 40 &&
+      data.serviceType is string && data.serviceType in ['train', 'flight', 'bus'] &&
+      data.trainNumber is string && data.trainNumber.size() >= 1 && data.trainNumber.size() <= 32 &&
+      data.trainName is string && data.trainName.size() >= 1 && data.trainName.size() <= 120 &&
+      data.fromStation is string && data.fromStation.size() >= 1 && data.fromStation.size() <= 120 &&
+      data.toStation is string && data.toStation.size() >= 1 && data.toStation.size() <= 120 &&
+      data.boardingStation is string && data.boardingStation.size() >= 1 && data.boardingStation.size() <= 120 &&
+      data.journeyDate is string && data.journeyDate.size() <= 20 && data.journeyDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+      isOptionalString(data, 'returnDate', 20) &&
+      data.travelClass is string && data.travelClass.size() >= 1 && data.travelClass.size() <= 64 &&
+      data.quota is string && data.quota.size() >= 1 && data.quota.size() <= 32 &&
+      isOptionalString(data, 'extraPreferences', 200) &&
+      isOptionalBool(data, 'allowAlternateTrain') &&
+      isOptionalBool(data, 'allowClassUpgrade') &&
+      isOptionalBool(data, 'isAdvanceOpeningPriority') &&
+      isOptionalString(data, 'referredBy', 100) &&
+      data.advancePaymentChoice is string && data.advancePaymentChoice in ['advance-token', 'pay-after-confirmation'] &&
+      data.advanceTokenAmount is number && data.advanceTokenAmount >= 0 && data.advanceTokenAmount <= 50000 &&
+      (!('paymentProofMethod' in data) || (data.paymentProofMethod is string && data.paymentProofMethod in ['screenshot', 'utr', 'whatsapp-chat', ''])) &&
+      isOptionalBool(data, 'hasPaymentScreenshot') &&
+      isOptionalString(data, 'paymentScreenshotOriginalName', 120) &&
+      isOptionalString(data, 'paymentScreenshotUrl', 1000) &&
+      data.passengers is list && data.passengers.size() >= 1 && data.passengers.size() <= 6 && data.passengers[0] is map &&
+      isValidMobileId(data.mobile) &&
+      isOptionalString(data, 'alternatePhone', 10) &&
+      isOptionalString(data, 'email', 120) &&
+      isOptionalString(data, 'paymentReference', 20) &&
+      data.deliveryChannel is string && data.deliveryChannel in ['whatsapp', 'email', 'admin-direct'] &&
+      data.status is string && data.status in ['Pending Verification', 'Fare Confirmed', 'Ticket Issued', 'Cancelled'] &&
+      isOptionalString(data, 'pnrNumber', 20) &&
+      isOptionalString(data, 'agentRemark', 300) &&
+      data.hasTicketPdf is bool &&
+      isOptionalString(data, 'pdfOriginalName', 120) &&
+      isOptionalString(data, 'ticketPdfUrl', 1000) &&
+      (!('ticketPdfStorage' in data) || (data.ticketPdfStorage is string && data.ticketPdfStorage in ['storage', 'firestore', 'none']));
+    }
+
+    function isValidTicketLookup(data) {
+      return data.keys().hasAll(['mobile', 'tickets', 'updatedAt']) &&
+      data.keys().hasOnly(['mobile', 'tickets', 'updatedAt']) &&
+      isValidMobileId(data.mobile) &&
+      data.tickets is list && data.tickets.size() <= 25 &&
+      (data.tickets.size() == 0 || data.tickets[0] is map) &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidTicketRefLookup(data) {
+      return data.keys().hasAll([
+        'referenceId',
+        'id',
+        'mobile',
+        'trainNumber',
+        'trainName',
+        'fromStation',
+        'toStation',
+        'journeyDate',
+        'travelClass',
+        'quota',
+        'passengerSummary',
+        'status',
+        'hasTicketPdf',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'referenceId',
+        'id',
+        'mobile',
+        'trainNumber',
+        'trainName',
+        'fromStation',
+        'toStation',
+        'journeyDate',
+        'travelClass',
+        'quota',
+        'passengerSummary',
+        'status',
+        'pnrNumber',
+        'agentRemark',
+        'hasTicketPdf',
+        'pdfOriginalName',
+        'ticketPdfUrl',
+        'ticketPdfStorage',
+        'updatedAt'
+      ]) &&
+      isValidRefId(data.referenceId) &&
+      isValidId(data.id) &&
+      isValidMobileId(data.mobile) &&
+      data.trainNumber is string && data.trainNumber.size() >= 1 && data.trainNumber.size() <= 32 &&
+      data.trainName is string && data.trainName.size() >= 1 && data.trainName.size() <= 120 &&
+      data.fromStation is string && data.fromStation.size() >= 1 && data.fromStation.size() <= 120 &&
+      data.toStation is string && data.toStation.size() >= 1 && data.toStation.size() <= 120 &&
+      data.journeyDate is string && data.journeyDate.size() <= 20 &&
+      data.travelClass is string && data.travelClass.size() >= 1 && data.travelClass.size() <= 64 &&
+      data.quota is string && data.quota.size() >= 1 && data.quota.size() <= 32 &&
+      data.passengerSummary is string && data.passengerSummary.size() <= 300 &&
+      data.status is string && data.status in ['Pending Verification', 'Fare Confirmed', 'Ticket Issued', 'Cancelled'] &&
+      isOptionalString(data, 'pnrNumber', 20) &&
+      isOptionalString(data, 'agentRemark', 300) &&
+      data.hasTicketPdf is bool &&
+      isOptionalString(data, 'pdfOriginalName', 120) &&
+      isOptionalString(data, 'ticketPdfUrl', 1000) &&
+      (!('ticketPdfStorage' in data) || (data.ticketPdfStorage is string && data.ticketPdfStorage in ['storage', 'firestore', 'none'])) &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidTicketPdfBlob(data) {
+      return data.keys().hasAll([
+        'bookingId',
+        'referenceId',
+        'mobile',
+        'pdfOriginalName',
+        'pdfDataUrl',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'bookingId',
+        'referenceId',
+        'mobile',
+        'pdfOriginalName',
+        'pdfDataUrl',
+        'updatedAt'
+      ]) &&
+      isValidId(data.bookingId) &&
+      isValidRefId(data.referenceId) &&
+      isValidMobileId(data.mobile) &&
+      data.pdfOriginalName is string && data.pdfOriginalName.size() >= 1 && data.pdfOriginalName.size() <= 120 &&
+      data.pdfDataUrl is string && data.pdfDataUrl.size() >= 20 && data.pdfDataUrl.size() <= 950000 &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidPaymentProofBlob(data) {
+      return data.keys().hasAll([
+        'bookingId',
+        'referenceId',
+        'originalName',
+        'imageDataUrl',
+        'createdAt'
+      ]) &&
+      data.keys().hasOnly([
+        'bookingId',
+        'referenceId',
+        'originalName',
+        'imageDataUrl',
+        'createdAt'
+      ]) &&
+      isValidId(data.bookingId) &&
+      isValidRefId(data.referenceId) &&
+      data.originalName is string && data.originalName.size() >= 1 && data.originalName.size() <= 120 &&
+      data.imageDataUrl is string && data.imageDataUrl.size() >= 30 && data.imageDataUrl.size() <= 500000 &&
+      data.createdAt is timestamp;
+    }
+
+    function isValidAdminConfig(data) {
+      return data.keys().hasAll([
+        'adminId',
+        'passwordSalt',
+        'passwordHash',
+        'updatedByUid',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'adminId',
+        'passwordSalt',
+        'passwordHash',
+        'updatedByUid',
+        'updatedAt'
+      ]) &&
+      data.adminId is string && data.adminId.size() >= 3 && data.adminId.size() <= 64 && data.adminId.matches('^[a-zA-Z0-9_\\.\\-]+$') &&
+      data.passwordSalt is string && data.passwordSalt.size() >= 8 && data.passwordSalt.size() <= 64 &&
+      data.passwordHash is string && data.passwordHash.size() >= 16 && data.passwordHash.size() <= 128 &&
+      data.updatedByUid is string && data.updatedByUid.size() >= 1 && data.updatedByUid.size() <= 128 &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidAdminUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'addedByUid', 'createdAt']) &&
+      data.keys().hasOnly(['uid', 'email', 'addedByUid', 'createdAt']) &&
+      isValidId(data.uid) &&
+      data.email is string && data.email.size() >= 5 && data.email.size() <= 120 &&
+      isValidId(data.addedByUid) &&
+      data.createdAt is timestamp;
+    }
+
+    // ============================================================
+    // Collection 1: /bookings/{bookingId} (Customer PII — Admin Read/Write Only)
+    // ============================================================
+    match /bookings/{bookingId} {
+      allow get: if isValidId(bookingId) && isAdmin();
+      allow list: if isBootstrappedOwner();
+
+      allow create: if isValidId(bookingId) &&
+        isValidBooking(incoming()) &&
+        incoming().id == bookingId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          // Public customer request creation (strict initial state only)
+          (
+            incoming().status == 'Pending Verification' &&
+            incoming().hasTicketPdf == false &&
+            incoming().deliveryChannel in ['whatsapp', 'email']
+          ) ||
+          // Admin direct ticket / booking creation
+          isAdmin()
+        );
+
+      allow update: if isValidBooking(incoming()) &&
+        isValidId(bookingId) &&
+        isAdmin() &&
+        incoming().id == existing().id &&
+        incoming().referenceId == existing().referenceId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'status',
+          'pnrNumber',
+          'agentRemark',
+          'hasTicketPdf',
+          'pdfOriginalName',
+          'ticketPdfUrl',
+          'ticketPdfStorage',
+          'updatedAt',
+          'updatedAtIso'
+        ]);
+
+      allow delete: if isValidId(bookingId) && isAdmin();
+    }
+
+    // ============================================================
+    // Collection 2: /ticketLookups/{mobile} (Exact 10-digit Mobile Single-Doc Get)
+    // ============================================================
+    match /ticketLookups/{mobile} {
+      allow get: if isValidMobileId(mobile);
+      allow list: if isBootstrappedOwner();
+
+      allow create: if isValidMobileId(mobile) &&
+        isValidTicketLookup(incoming()) &&
+        isAdmin() &&
+        incoming().mobile == mobile &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidTicketLookup(incoming()) &&
+        isValidMobileId(mobile) &&
+        isAdmin() &&
+        incoming().mobile == existing().mobile &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['tickets', 'updatedAt']);
+
+      allow delete: if isValidMobileId(mobile) && isAdmin();
+    }
+
+    // ============================================================
+    // Collection 3: /ticketByRef/{referenceId} (Exact ST-... Ref Single-Doc Get)
+    // ============================================================
+    match /ticketByRef/{referenceId} {
+      allow get: if isValidRefId(referenceId);
+      allow list: if isBootstrappedOwner();
+
+      allow create: if isValidRefId(referenceId) &&
+        isValidTicketRefLookup(incoming()) &&
+        isAdmin() &&
+        incoming().referenceId == referenceId &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidTicketRefLookup(incoming()) &&
+        isValidRefId(referenceId) &&
+        isAdmin() &&
+        incoming().referenceId == existing().referenceId &&
+        incoming().id == existing().id &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'status',
+          'pnrNumber',
+          'agentRemark',
+          'hasTicketPdf',
+          'pdfOriginalName',
+          'ticketPdfUrl',
+          'ticketPdfStorage',
+          'updatedAt'
+        ]);
+
+      allow delete: if isValidRefId(referenceId) && isAdmin();
+    }
+
+    // ============================================================
+    // Collection 4: /ticketPdfs/{bookingId} (Fallback Confirmed Ticket PDF Storage)
+    // ============================================================
+    match /ticketPdfs/{bookingId} {
+      allow get: if isValidId(bookingId);
+      allow list: if isBootstrappedOwner();
+
+      allow create: if isValidId(bookingId) &&
+        isValidTicketPdfBlob(incoming()) &&
+        isAdmin() &&
+        incoming().bookingId == bookingId &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidTicketPdfBlob(incoming()) &&
+        isValidId(bookingId) &&
+        isAdmin() &&
+        incoming().bookingId == existing().bookingId &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'pdfOriginalName',
+          'pdfDataUrl',
+          'updatedAt'
+        ]);
+
+      allow delete: if isValidId(bookingId) && isAdmin();
+    }
+
+    // ============================================================
+    // Collection 5: /paymentProofs/{bookingId} (Admin-Only Screenshot Read)
+    // ============================================================
+    match /paymentProofs/{bookingId} {
+      allow get: if isValidId(bookingId) && isAdmin();
+      allow list: if isBootstrappedOwner();
+
+      allow create: if isValidId(bookingId) &&
+        isValidPaymentProofBlob(incoming()) &&
+        incoming().bookingId == bookingId &&
+        incoming().createdAt == request.time;
+
+      allow update: if false;
+      allow delete: if isValidId(bookingId) && isAdmin();
+    }
+
+    // ============================================================
+    // Collection 6: /adminConfig/{configId} (Admin Console Lock Hash)
+    // ============================================================
+    match /adminConfig/{configId} {
+      allow get: if isValidId(configId) && isAdmin();
+      allow list: if isBootstrappedOwner();
+
+      allow create: if isValidId(configId) &&
+        isValidAdminConfig(incoming()) &&
+        isAdmin() &&
+        incoming().updatedByUid == request.auth.uid &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidAdminConfig(incoming()) &&
+        isValidId(configId) &&
+        isAdmin() &&
+        incoming().updatedByUid == request.auth.uid &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'adminId',
+          'passwordSalt',
+          'passwordHash',
+          'updatedByUid',
+          'updatedAt'
+        ]);
+
+      allow delete: if isValidId(configId) && isAdmin();
+    }
+
+    // ============================================================
+    // Collection 7: /admins/{uid} (Authorized Staff Admin Registry)
+    // ============================================================
+    match /admins/{uid} {
+      allow get: if isValidId(uid) && isVerifiedUser() && (request.auth.uid == uid || isBootstrappedOwner());
+      allow list: if isBootstrappedOwner();
+
+      allow create: if isValidId(uid) &&
+        isValidAdminUser(incoming()) &&
+        isBootstrappedOwner() &&
+        incoming().uid == uid &&
+        incoming().addedByUid == request.auth.uid &&
+        incoming().createdAt == request.time;
+
+      allow update: if false;
+      allow delete: if isValidId(uid) && isBootstrappedOwner();
+    }
+  }
+}

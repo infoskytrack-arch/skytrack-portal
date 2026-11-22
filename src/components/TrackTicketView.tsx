@@ -14,9 +14,9 @@ import {
 import { AGENCY_CONTACT, type BookingRequestRecord } from '../types';
 import { formatReadableDate } from '../utils/bookingFormat';
 import {
-  downloadLocalTicketPdf,
-  trackLocalBookingRequests,
-} from '../utils/localBookingStore';
+  downloadCloudTicketPdf,
+  trackCloudTicketRequests,
+} from '../utils/cloudBookingStore';
 
 interface TrackTicketViewProps {
   initialMobile?: string;
@@ -34,7 +34,9 @@ export function TrackTicketView({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  function runLookup(rawQuery: string) {
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  async function runLookup(rawQuery: string) {
     const cleaned = rawQuery.trim();
     if (!cleaned) {
       setError('Please enter your 10-digit mobile number or Booking Reference ID.');
@@ -44,22 +46,43 @@ export function TrackTicketView({
     setError('');
     setLoading(true);
     try {
-      const matched = trackLocalBookingRequests(cleaned);
+      const matched = await trackCloudTicketRequests(cleaned);
       setResults(matched);
     } catch (err) {
       setResults(null);
-      setError(err instanceof Error ? err.message : 'Unable to search right now.');
+      let friendly = 'Unable to search right now. Please try again.';
+      if (err instanceof Error) {
+        try {
+          const parsed = JSON.parse(err.message) as { error?: string };
+          friendly = parsed.error || err.message;
+        } catch {
+          friendly = err.message;
+        }
+      }
+      setError(friendly);
     } finally {
       setLoading(false);
     }
   }
 
-  function handleDownloadPdf(rec: BookingRequestRecord) {
+  async function handleDownloadPdf(rec: BookingRequestRecord) {
     setError('');
+    setDownloadingId(rec.id);
     try {
-      downloadLocalTicketPdf(rec);
+      await downloadCloudTicketPdf(rec);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to download ticket PDF.');
+      let friendly = 'Unable to download ticket PDF right now.';
+      if (err instanceof Error) {
+        try {
+          const parsed = JSON.parse(err.message) as { error?: string };
+          friendly = parsed.error || err.message;
+        } catch {
+          friendly = err.message;
+        }
+      }
+      setError(friendly);
+    } finally {
+      setDownloadingId(null);
     }
   }
 
@@ -276,11 +299,16 @@ export function TrackTicketView({
                         {rec.hasTicketPdf ? (
                           <button
                             type="button"
+                            disabled={downloadingId === rec.id}
                             onClick={() => handleDownloadPdf(rec)}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold rounded-md transition-colors whitespace-nowrap cursor-pointer"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white text-sm font-bold rounded-md transition-colors whitespace-nowrap cursor-pointer"
                           >
                             <Download className="w-4 h-4" />
-                            <span>Download Ticket PDF</span>
+                            <span>
+                              {downloadingId === rec.id
+                                ? 'Downloading PDF...'
+                                : 'Download Ticket PDF'}
+                            </span>
                           </button>
                         ) : (
                           <a

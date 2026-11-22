@@ -41,12 +41,29 @@ export type RequestStatus =
   | 'Ticket Issued'
   | 'Cancelled';
 
+export type AvailabilityCategory = 'AVAILABLE' | 'RAC' | 'WL' | 'NOT_AVAILABLE';
+
+export interface ClassAvailabilityQuote {
+  classCode: SelectableClassCode;
+  classLabel: string;
+  baseFare: number;
+  quotaSurcharge: number;
+  totalFare: number;
+  statusText: string;
+  statusCategory: AvailabilityCategory;
+  isBookable: boolean;
+  surchargeNote?: string;
+}
+
 export interface Station {
   code: string;
   name: string;
   city: string;
   state: string;
+  lat: number;
+  lng: number;
   popular?: boolean;
+  aliases?: string[];
 }
 
 export interface TrainSchedule {
@@ -62,9 +79,11 @@ export interface TrainSchedule {
   runsOn: [boolean, boolean, boolean, boolean, boolean, boolean, boolean]; // Mon..Sun
   classes: SelectableClassCode[];
   trainType: string;
+  distanceKm?: number;
   routeStops?: string[];
   matchedNote?: string;
   isCustomOption?: boolean;
+  isSimulatedSchedule?: boolean;
 }
 
 export interface PassengerDetail {
@@ -101,6 +120,7 @@ export interface BookingRequestRecord {
   paymentProofMethod?: PaymentProofMethod;
   hasPaymentScreenshot?: boolean;
   paymentScreenshotOriginalName?: string;
+  paymentScreenshotUrl?: string;
   passengers: Array<{
     name: string;
     age: number;
@@ -118,6 +138,8 @@ export interface BookingRequestRecord {
   agentRemark?: string;
   hasTicketPdf: boolean;
   pdfOriginalName?: string;
+  ticketPdfUrl?: string;
+  ticketPdfStorage?: 'storage' | 'firestore' | 'none';
 }
 
 export const TRAVEL_CLASSES: Array<{
@@ -126,8 +148,8 @@ export const TRAVEL_CLASSES: Array<{
   shortLabel: string;
 }> = [
   { code: 'SL', label: 'Sleeper (SL)', shortLabel: 'SL' },
-  { code: '3A', label: 'AC 3 Tier (3A)', shortLabel: '3A' },
   { code: '3E', label: 'AC 3 Economy (3E)', shortLabel: '3E' },
+  { code: '3A', label: 'AC 3 Tier (3A)', shortLabel: '3A' },
   { code: '2A', label: 'AC 2 Tier (2A)', shortLabel: '2A' },
   { code: '1A', label: 'AC First Class (1A)', shortLabel: '1A' },
   { code: 'CC', label: 'AC Chair Car (CC)', shortLabel: 'CC' },

@@ -48,7 +48,7 @@ export function StationAutocomplete({
   const queryForSearch =
     selectedStation && inputValue === formatStationLabel(selectedStation) ? '' : inputValue;
 
-  const suggestions = searchStations(queryForSearch, 14).filter(
+  const suggestions = searchStations(queryForSearch, 16).filter(
     (s) => s.code !== excludeCode
   );
 
@@ -82,7 +82,7 @@ export function StationAutocomplete({
     <div ref={containerRef} className="relative">
       <label
         htmlFor={inputId}
-        className="block text-xs font-semibold text-[#213D77] mb-1.5"
+        className="block text-xs font-bold text-[#213D77] mb-1.5"
       >
         {label}
       </label>
@@ -112,7 +112,7 @@ export function StationAutocomplete({
             }
           }}
           onKeyDown={handleKeyDown}
-          className="w-full h-11 pl-9 pr-9 text-sm font-medium text-slate-900 bg-white border border-slate-300 rounded-md focus:outline-none focus:border-[#213D77] focus:ring-2 focus:ring-[#213D77]/15 transition-colors"
+          className="w-full h-11 pl-9 pr-8 text-sm font-semibold text-slate-900 bg-white border border-slate-300 rounded-md focus:outline-none focus:border-[#213D77] focus:ring-2 focus:ring-[#213D77]/15 transition-colors"
         />
         {inputValue && (
           <button
@@ -123,7 +123,7 @@ export function StationAutocomplete({
               onSelect(null);
               setIsOpen(true);
             }}
-            className="absolute right-2.5 p-1 text-slate-400 hover:text-slate-700 rounded cursor-pointer"
+            className="absolute right-2 p-1 text-slate-400 hover:text-slate-700 rounded cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -134,13 +134,13 @@ export function StationAutocomplete({
         <div
           id={listboxId}
           role="listbox"
-          className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-72 overflow-y-auto"
+          className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-72 overflow-y-auto"
         >
-          <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 text-[11px] font-medium text-slate-500 flex items-center justify-between">
+          <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 text-[11px] font-semibold text-slate-500 flex items-center justify-between">
             <span>
-              {queryForSearch ? `Matching Stations (${suggestions.length})` : 'Major Indian Railway Stations'}
+              {queryForSearch ? `Matching Stations (${suggestions.length})` : 'Major Indian Railways Stations'}
             </span>
-            <span>Type city, name, or code</span>
+            <span>Search by name or code</span>
           </div>
 
           {suggestions.length === 0 ? (
@@ -161,8 +161,8 @@ export function StationAutocomplete({
                     e.preventDefault();
                     handleSelectStation(station);
                   }}
-                  className={`w-full px-3 py-2.5 text-left flex items-center justify-between gap-3 border-b border-slate-100 last:border-b-0 transition-colors cursor-pointer ${
-                    isHighlighted ? 'bg-[#213D77]/8' : 'hover:bg-slate-50'
+                  className={`w-full px-3 py-2 text-left flex items-center justify-between gap-3 border-b border-slate-100 last:border-b-0 transition-colors cursor-pointer ${
+                    isHighlighted ? 'bg-[#F4F7FC]' : 'hover:bg-slate-50'
                   }`}
                 >
                   <div className="min-w-0">

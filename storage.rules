@@ -1,0 +1,33 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isVerifiedAdmin() {
+      return request.auth != null &&
+        request.auth.token.email_verified == true &&
+        request.auth.token.email in ['infoskytracktravel@gmail.com', 'infoskytrack2008@gmail.com'];
+    }
+
+    // Confirmed ticket PDFs uploaded by Admin, downloadable by customer via direct download URL
+    match /tickets/{mobile}/{fileName} {
+      allow get: if mobile.matches('^[6-9][0-9]{9}$') && fileName.matches('^SKYTRACK-ST-[0-9]{8}-[A-Z0-9]{4}\\.pdf$');
+      allow list: if isVerifiedAdmin();
+      allow write: if isVerifiedAdmin() &&
+        request.resource.size <= 5 * 1024 * 1024 &&
+        request.resource.contentType == 'application/pdf';
+      allow delete: if isVerifiedAdmin();
+    }
+
+    // Customer payment proof screenshots (uploadable on request, readable/deletable strictly by Admin)
+    match /payment-proofs/{bookingId}/{fileName} {
+      allow read, delete: if isVerifiedAdmin();
+      allow create: if bookingId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        request.resource.size <= 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('^image/(jpeg|png)$');
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

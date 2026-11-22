@@ -1,4 +1,8 @@
 import type { SelectableClassCode, Station, TrainSchedule, TravelClassCode } from '../types';
+import {
+  calculateRailwayDistanceKm,
+  formatDurationFromMinutes,
+} from '../utils/fareAndAvailabilityEngine';
 
 type WeekFlags = [boolean, boolean, boolean, boolean, boolean, boolean, boolean];
 
@@ -44,7 +48,7 @@ export const TRAIN_SCHEDULES: TrainSchedule[] = [
     arrivalTime: '21:20',
     duration: '31h 15m',
     runsOn: DAILY,
-    classes: ['SL', '3A', '3E', '2A'],
+    classes: ['SL', '3E', '3A', '2A', '1A'],
     trainType: 'Superfast Express',
     routeStops: ['HWH', 'KGP', 'TATA', 'ROU', 'BSP', 'R', 'DURG', 'NGP', 'AK', 'BSL', 'JL', 'NK', 'KYN', 'DR', 'CSMT'],
   },
@@ -59,7 +63,7 @@ export const TRAIN_SCHEDULES: TrainSchedule[] = [
     arrivalTime: '12:55',
     duration: '30h 55m',
     runsOn: DAILY,
-    classes: ['SL', '3A', '3E', '2A'],
+    classes: ['SL', '3E', '3A', '2A', '1A'],
     trainType: 'Superfast Express',
     routeStops: ['CSMT', 'DR', 'KYN', 'NK', 'JL', 'BSL', 'AK', 'NGP', 'DURG', 'R', 'BSP', 'ROU', 'TATA', 'KGP', 'HWH'],
   },
@@ -1407,28 +1411,781 @@ export const TRAIN_SCHEDULES: TrainSchedule[] = [
     trainType: 'Superfast Express',
     routeStops: ['MAS', 'SUR', 'PUNE', 'KYN', 'DR', 'CSMT'],
   },
+
+  // =========================================================================
+  // 8. ALL-INDIA NORTH <-> SOUTH, NORTH <-> WEST & SOUTH TRUNK CORRIDORS
+  // =========================================================================
+  {
+    trainNumber: '12622',
+    trainName: 'TAMIL NADU EXPRESS',
+    fromCode: 'NDLS',
+    fromName: 'NEW DELHI',
+    toCode: 'MAS',
+    toName: 'MGR CHENNAI CENTRAL',
+    departureTime: '21:05',
+    arrivalTime: '06:15',
+    duration: '33h 10m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['NDLS', 'AGC', 'GWL', 'VGLJ', 'BPL', 'ET', 'NGP', 'WL', 'BZA', 'MAS'],
+  },
+  {
+    trainNumber: '12621',
+    trainName: 'TAMIL NADU EXPRESS',
+    fromCode: 'MAS',
+    fromName: 'MGR CHENNAI CENTRAL',
+    toCode: 'NDLS',
+    toName: 'NEW DELHI',
+    departureTime: '22:00',
+    arrivalTime: '06:30',
+    duration: '32h 30m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['MAS', 'BZA', 'WL', 'NGP', 'ET', 'BPL', 'VGLJ', 'GWL', 'AGC', 'NDLS'],
+  },
+  {
+    trainNumber: '12616',
+    trainName: 'GRAND TRUNK EXPRESS',
+    fromCode: 'NDLS',
+    fromName: 'NEW DELHI',
+    toCode: 'MAS',
+    toName: 'MGR CHENNAI CENTRAL',
+    departureTime: '16:10',
+    arrivalTime: '04:30',
+    duration: '36h 20m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['NDLS', 'MTJ', 'AGC', 'GWL', 'VGLJ', 'BINA', 'BPL', 'ET', 'NGP', 'WL', 'BZA', 'NLR', 'MAS'],
+  },
+  {
+    trainNumber: '12615',
+    trainName: 'GRAND TRUNK EXPRESS',
+    fromCode: 'MAS',
+    fromName: 'MGR CHENNAI CENTRAL',
+    toCode: 'NDLS',
+    toName: 'NEW DELHI',
+    departureTime: '18:40',
+    arrivalTime: '05:05',
+    duration: '34h 25m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['MAS', 'NLR', 'BZA', 'WL', 'NGP', 'ET', 'BPL', 'BINA', 'VGLJ', 'GWL', 'AGC', 'MTJ', 'NDLS'],
+  },
+  {
+    trainNumber: '12628',
+    trainName: 'KARNATAKA EXPRESS',
+    fromCode: 'NDLS',
+    fromName: 'NEW DELHI',
+    toCode: 'SBC',
+    toName: 'KSR BENGALURU',
+    departureTime: '20:20',
+    arrivalTime: '12:00',
+    duration: '39h 40m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['NDLS', 'MTJ', 'AGC', 'GWL', 'VGLJ', 'BPL', 'ET', 'BSL', 'MMR', 'SUR', 'GTL', 'SBC'],
+  },
+  {
+    trainNumber: '12627',
+    trainName: 'KARNATAKA EXPRESS',
+    fromCode: 'SBC',
+    fromName: 'KSR BENGALURU',
+    toCode: 'NDLS',
+    toName: 'NEW DELHI',
+    departureTime: '19:20',
+    arrivalTime: '09:00',
+    duration: '37h 40m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['SBC', 'GTL', 'SUR', 'MMR', 'BSL', 'ET', 'BPL', 'VGLJ', 'GWL', 'AGC', 'MTJ', 'NDLS'],
+  },
+  {
+    trainNumber: '22692',
+    trainName: 'KSR BENGALURU RAJDHANI EXPRESS',
+    fromCode: 'NZM',
+    fromName: 'HAZRAT NIZAMUDDIN',
+    toCode: 'SBC',
+    toName: 'KSR BENGALURU',
+    departureTime: '19:50',
+    arrivalTime: '05:20',
+    duration: '33h 30m',
+    runsOn: DAILY,
+    classes: ['3A', '2A', '1A'],
+    trainType: 'Rajdhani Express',
+    routeStops: ['NZM', 'AGC', 'VGLJ', 'BPL', 'NGP', 'SC', 'GTL', 'SBC'],
+  },
+  {
+    trainNumber: '22691',
+    trainName: 'HAZRAT NIZAMUDDIN RAJDHANI EXPRESS',
+    fromCode: 'SBC',
+    fromName: 'KSR BENGALURU',
+    toCode: 'NZM',
+    toName: 'HAZRAT NIZAMUDDIN',
+    departureTime: '20:00',
+    arrivalTime: '05:30',
+    duration: '33h 30m',
+    runsOn: DAILY,
+    classes: ['3A', '2A', '1A'],
+    trainType: 'Rajdhani Express',
+    routeStops: ['SBC', 'GTL', 'SC', 'NGP', 'BPL', 'VGLJ', 'AGC', 'NZM'],
+  },
+  {
+    trainNumber: '12724',
+    trainName: 'TELANGANA EXPRESS',
+    fromCode: 'NDLS',
+    fromName: 'NEW DELHI',
+    toCode: 'HYB',
+    toName: 'HYDERABAD DECAN',
+    departureTime: '16:00',
+    arrivalTime: '17:00',
+    duration: '25h 00m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['NDLS', 'MTJ', 'AGC', 'GWL', 'VGLJ', 'BPL', 'NGP', 'SC', 'HYB'],
+  },
+  {
+    trainNumber: '12723',
+    trainName: 'TELANGANA EXPRESS',
+    fromCode: 'HYB',
+    fromName: 'HYDERABAD DECAN',
+    toCode: 'NDLS',
+    toName: 'NEW DELHI',
+    departureTime: '06:00',
+    arrivalTime: '07:40',
+    duration: '25h 40m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['HYB', 'SC', 'NGP', 'BPL', 'VGLJ', 'GWL', 'AGC', 'MTJ', 'NDLS'],
+  },
+  {
+    trainNumber: '12916',
+    trainName: 'ASHRAM EXPRESS',
+    fromCode: 'DLI',
+    fromName: 'OLD DELHI',
+    toCode: 'ADI',
+    toName: 'AHMEDABAD JN',
+    departureTime: '15:20',
+    arrivalTime: '06:20',
+    duration: '15h 00m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['DLI', 'AWR', 'JP', 'AII', 'ABR', 'PNU', 'MSH', 'ADI'],
+  },
+  {
+    trainNumber: '12915',
+    trainName: 'ASHRAM EXPRESS',
+    fromCode: 'ADI',
+    fromName: 'AHMEDABAD JN',
+    toCode: 'DLI',
+    toName: 'OLD DELHI',
+    departureTime: '19:15',
+    arrivalTime: '10:00',
+    duration: '14h 45m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['ADI', 'MSH', 'PNU', 'ABR', 'AII', 'JP', 'AWR', 'DLI'],
+  },
+  {
+    trainNumber: '12958',
+    trainName: 'SWARNA JAYANTI RAJDHANI',
+    fromCode: 'NDLS',
+    fromName: 'NEW DELHI',
+    toCode: 'ADI',
+    toName: 'AHMEDABAD JN',
+    departureTime: '19:55',
+    arrivalTime: '08:25',
+    duration: '12h 30m',
+    runsOn: DAILY,
+    classes: ['3A', '2A', '1A'],
+    trainType: 'Rajdhani Express',
+    routeStops: ['NDLS', 'JP', 'AII', 'ABR', 'PNU', 'MSH', 'ADI'],
+  },
+  {
+    trainNumber: '12957',
+    trainName: 'SWARNA JAYANTI RAJDHANI',
+    fromCode: 'ADI',
+    fromName: 'AHMEDABAD JN',
+    toCode: 'NDLS',
+    toName: 'NEW DELHI',
+    departureTime: '18:55',
+    arrivalTime: '07:30',
+    duration: '12h 35m',
+    runsOn: DAILY,
+    classes: ['3A', '2A', '1A'],
+    trainType: 'Rajdhani Express',
+    routeStops: ['ADI', 'MSH', 'PNU', 'ABR', 'AII', 'JP', 'NDLS'],
+  },
+  {
+    trainNumber: '12394',
+    trainName: 'SAMPOORNA KRANTI EXPRESS',
+    fromCode: 'NDLS',
+    fromName: 'NEW DELHI',
+    toCode: 'RJPB',
+    toName: 'RAJENDRANAGAR T',
+    departureTime: '17:30',
+    arrivalTime: '06:35',
+    duration: '13h 05m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['NDLS', 'CNB', 'DDU', 'DNR', 'PNBE', 'RJPB'],
+  },
+  {
+    trainNumber: '12393',
+    trainName: 'SAMPOORNA KRANTI EXPRESS',
+    fromCode: 'RJPB',
+    fromName: 'RAJENDRANAGAR T',
+    toCode: 'NDLS',
+    toName: 'NEW DELHI',
+    departureTime: '19:25',
+    arrivalTime: '07:55',
+    duration: '12h 30m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['RJPB', 'PNBE', 'DNR', 'DDU', 'CNB', 'NDLS'],
+  },
+  {
+    trainNumber: '12230',
+    trainName: 'LUCKNOW MAIL',
+    fromCode: 'NDLS',
+    fromName: 'NEW DELHI',
+    toCode: 'LKO',
+    toName: 'LUCKNOW NR',
+    departureTime: '22:00',
+    arrivalTime: '06:55',
+    duration: '08h 55m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Mail',
+    routeStops: ['NDLS', 'GZB', 'MB', 'BE', 'LKO'],
+  },
+  {
+    trainNumber: '12229',
+    trainName: 'LUCKNOW MAIL',
+    fromCode: 'LKO',
+    fromName: 'LUCKNOW NR',
+    toCode: 'NDLS',
+    toName: 'NEW DELHI',
+    departureTime: '22:00',
+    arrivalTime: '06:55',
+    duration: '08h 55m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Mail',
+    routeStops: ['LKO', 'BE', 'MB', 'GZB', 'NDLS'],
+  },
+  {
+    trainNumber: '12903',
+    trainName: 'GOLDEN TEMPLE MAIL',
+    fromCode: 'MMCT',
+    fromName: 'MUMBAI CENTRAL',
+    toCode: 'ASR',
+    toName: 'AMRITSAR JN',
+    departureTime: '18:45',
+    arrivalTime: '23:45',
+    duration: '29h 00m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Mail',
+    routeStops: ['MMCT', 'BVI', 'ST', 'BRC', 'RTM', 'KOTA', 'SWM', 'MTJ', 'NZM', 'GZB', 'SRE', 'UMB', 'LDH', 'JUC', 'ASR'],
+  },
+  {
+    trainNumber: '12904',
+    trainName: 'GOLDEN TEMPLE MAIL',
+    fromCode: 'ASR',
+    fromName: 'AMRITSAR JN',
+    toCode: 'MMCT',
+    toName: 'MUMBAI CENTRAL',
+    departureTime: '18:55',
+    arrivalTime: '23:35',
+    duration: '28h 40m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Mail',
+    routeStops: ['ASR', 'JUC', 'LDH', 'UMB', 'SRE', 'GZB', 'NZM', 'MTJ', 'SWM', 'KOTA', 'RTM', 'BRC', 'ST', 'BVI', 'MMCT'],
+  },
+  {
+    trainNumber: '12534',
+    trainName: 'PUSHPAK EXPRESS',
+    fromCode: 'CSMT',
+    fromName: 'MUMBAI CSMT',
+    toCode: 'LJN',
+    toName: 'LUCKNOW NE',
+    departureTime: '08:25',
+    arrivalTime: '07:10',
+    duration: '22h 45m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['CSMT', 'KYN', 'NK', 'MMR', 'BSL', 'ET', 'BPL', 'VGLJ', 'CNB', 'LJN'],
+  },
+  {
+    trainNumber: '12533',
+    trainName: 'PUSHPAK EXPRESS',
+    fromCode: 'LJN',
+    fromName: 'LUCKNOW NE',
+    toCode: 'CSMT',
+    toName: 'MUMBAI CSMT',
+    departureTime: '21:25',
+    arrivalTime: '22:45',
+    duration: '25h 20m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['LJN', 'CNB', 'VGLJ', 'BPL', 'ET', 'BSL', 'MMR', 'NK', 'KYN', 'CSMT'],
+  },
+  {
+    trainNumber: '20111',
+    trainName: 'KONKAN KANYA EXPRESS',
+    fromCode: 'CSMT',
+    fromName: 'MUMBAI CSMT',
+    toCode: 'MAO',
+    toName: 'MADGAON',
+    departureTime: '23:05',
+    arrivalTime: '10:45',
+    duration: '11h 40m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['CSMT', 'DR', 'TNA', 'PNVL', 'RN', 'MAO'],
+  },
+  {
+    trainNumber: '20112',
+    trainName: 'KONKAN KANYA EXPRESS',
+    fromCode: 'MAO',
+    fromName: 'MADGAON',
+    toCode: 'CSMT',
+    toName: 'MUMBAI CSMT',
+    departureTime: '19:00',
+    arrivalTime: '05:40',
+    duration: '10h 40m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['MAO', 'RN', 'PNVL', 'TNA', 'DR', 'CSMT'],
+  },
+  {
+    trainNumber: '16345',
+    trainName: 'NETRAVATI EXPRESS',
+    fromCode: 'LTT',
+    fromName: 'LOKMANYATILAK T',
+    toCode: 'TVC',
+    toName: 'THIRUVANANTHAPURAM CENTRAL',
+    departureTime: '11:40',
+    arrivalTime: '18:05',
+    duration: '30h 25m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A'],
+    trainType: 'Express',
+    routeStops: ['LTT', 'TNA', 'PNVL', 'RN', 'MAO', 'UD', 'MAQ', 'CAN', 'CLT', 'SRR', 'TCR', 'ERS', 'KTYM', 'TVC'],
+  },
+  {
+    trainNumber: '16346',
+    trainName: 'NETRAVATI EXPRESS',
+    fromCode: 'TVC',
+    fromName: 'THIRUVANANTHAPURAM CENTRAL',
+    toCode: 'LTT',
+    toName: 'LOKMANYATILAK T',
+    departureTime: '09:15',
+    arrivalTime: '17:05',
+    duration: '31h 50m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A'],
+    trainType: 'Express',
+    routeStops: ['TVC', 'KTYM', 'ERS', 'TCR', 'SRR', 'CLT', 'CAN', 'MAQ', 'UD', 'MAO', 'RN', 'PNVL', 'TNA', 'LTT'],
+  },
+  {
+    trainNumber: '12639',
+    trainName: 'BRINDAVAN SF EXPRESS',
+    fromCode: 'MAS',
+    fromName: 'MGR CHENNAI CENTRAL',
+    toCode: 'SBC',
+    toName: 'KSR BENGALURU',
+    departureTime: '07:40',
+    arrivalTime: '13:40',
+    duration: '06h 00m',
+    runsOn: DAILY,
+    classes: ['2S', 'CC'],
+    trainType: 'Superfast Express',
+    routeStops: ['MAS', 'KPD', 'SBC'],
+  },
+  {
+    trainNumber: '12640',
+    trainName: 'BRINDAVAN SF EXPRESS',
+    fromCode: 'SBC',
+    fromName: 'KSR BENGALURU',
+    toCode: 'MAS',
+    toName: 'MGR CHENNAI CENTRAL',
+    departureTime: '15:10',
+    arrivalTime: '21:05',
+    duration: '05h 55m',
+    runsOn: DAILY,
+    classes: ['2S', 'CC'],
+    trainType: 'Superfast Express',
+    routeStops: ['SBC', 'KPD', 'MAS'],
+  },
+  {
+    trainNumber: '12657',
+    trainName: 'CHENNAI - BENGALURU SF MAIL',
+    fromCode: 'MAS',
+    fromName: 'MGR CHENNAI CENTRAL',
+    toCode: 'SBC',
+    toName: 'KSR BENGALURU',
+    departureTime: '22:55',
+    arrivalTime: '04:35',
+    duration: '05h 40m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Mail',
+    routeStops: ['MAS', 'KPD', 'SBC'],
+  },
+  {
+    trainNumber: '12658',
+    trainName: 'BENGALURU - CHENNAI SF MAIL',
+    fromCode: 'SBC',
+    fromName: 'KSR BENGALURU',
+    toCode: 'MAS',
+    toName: 'MGR CHENNAI CENTRAL',
+    departureTime: '22:40',
+    arrivalTime: '04:30',
+    duration: '05h 50m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Mail',
+    routeStops: ['SBC', 'KPD', 'MAS'],
+  },
+  {
+    trainNumber: '12786',
+    trainName: 'KACHEGUDA SF EXPRESS',
+    fromCode: 'SBC',
+    fromName: 'KSR BENGALURU',
+    toCode: 'KCG',
+    toName: 'KACHEGUDA',
+    departureTime: '18:20',
+    arrivalTime: '05:40',
+    duration: '11h 20m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['SBC', 'YPR', 'KCG', 'SC', 'HYB'],
+  },
+  {
+    trainNumber: '12785',
+    trainName: 'KACHEGUDA - BENGALURU SF EXPRESS',
+    fromCode: 'KCG',
+    fromName: 'KACHEGUDA',
+    toCode: 'SBC',
+    toName: 'KSR BENGALURU',
+    departureTime: '19:05',
+    arrivalTime: '06:25',
+    duration: '11h 20m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['HYB', 'SC', 'KCG', 'YPR', 'SBC'],
+  },
+  {
+    trainNumber: '12759',
+    trainName: 'CHARMINAR SF EXPRESS',
+    fromCode: 'MAS',
+    fromName: 'MGR CHENNAI CENTRAL',
+    toCode: 'HYB',
+    toName: 'HYDERABAD DECAN',
+    departureTime: '18:00',
+    arrivalTime: '07:55',
+    duration: '13h 55m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['MAS', 'NLR', 'BZA', 'WL', 'SC', 'HYB'],
+  },
+  {
+    trainNumber: '12760',
+    trainName: 'CHARMINAR SF EXPRESS',
+    fromCode: 'HYB',
+    fromName: 'HYDERABAD DECAN',
+    toCode: 'MAS',
+    toName: 'MGR CHENNAI CENTRAL',
+    departureTime: '18:00',
+    arrivalTime: '07:45',
+    duration: '13h 45m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['HYB', 'SC', 'WL', 'BZA', 'NLR', 'MAS'],
+  },
+  {
+    trainNumber: '12424',
+    trainName: 'DIBRUGARH RAJDHANI EXPRESS',
+    fromCode: 'NDLS',
+    fromName: 'NEW DELHI',
+    toCode: 'DBRG',
+    toName: 'DIBRUGARH',
+    departureTime: '16:20',
+    arrivalTime: '07:00',
+    duration: '38h 40m',
+    runsOn: DAILY,
+    classes: ['3A', '2A', '1A'],
+    trainType: 'Rajdhani Express',
+    routeStops: ['NDLS', 'CNB', 'PRYJ', 'DDU', 'PNBE', 'BJU', 'KIR', 'NJP', 'NCB', 'GHY', 'DMV', 'DBRG'],
+  },
+  {
+    trainNumber: '12423',
+    trainName: 'NEW DELHI RAJDHANI EXPRESS',
+    fromCode: 'DBRG',
+    fromName: 'DIBRUGARH',
+    toCode: 'NDLS',
+    toName: 'NEW DELHI',
+    departureTime: '20:55',
+    arrivalTime: '10:30',
+    duration: '37h 35m',
+    runsOn: DAILY,
+    classes: ['3A', '2A', '1A'],
+    trainType: 'Rajdhani Express',
+    routeStops: ['DBRG', 'DMV', 'GHY', 'NCB', 'NJP', 'KIR', 'BJU', 'PNBE', 'DDU', 'PRYJ', 'CNB', 'NDLS'],
+  },
+  {
+    trainNumber: '12701',
+    trainName: 'HUSSAINSAGAR SF EXPRESS',
+    fromCode: 'CSMT',
+    fromName: 'MUMBAI CSMT',
+    toCode: 'HYB',
+    toName: 'HYDERABAD DECAN',
+    departureTime: '21:50',
+    arrivalTime: '12:10',
+    duration: '14h 20m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['CSMT', 'DR', 'KYN', 'PUNE', 'SUR', 'SC', 'HYB'],
+  },
+  {
+    trainNumber: '12702',
+    trainName: 'HUSSAINSAGAR SF EXPRESS',
+    fromCode: 'HYB',
+    fromName: 'HYDERABAD DECAN',
+    toCode: 'CSMT',
+    toName: 'MUMBAI CSMT',
+    departureTime: '14:50',
+    arrivalTime: '04:55',
+    duration: '14h 05m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A', '1A'],
+    trainType: 'Superfast Express',
+    routeStops: ['HYB', 'SC', 'SUR', 'PUNE', 'KYN', 'DR', 'CSMT'],
+  },
+  {
+    trainNumber: '11077',
+    trainName: 'JHELUM EXPRESS',
+    fromCode: 'PUNE',
+    fromName: 'PUNE JN',
+    toCode: 'JAT',
+    toName: 'JAMMU TAWI',
+    departureTime: '17:20',
+    arrivalTime: '10:15',
+    duration: '40h 55m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A'],
+    trainType: 'Express',
+    routeStops: ['PUNE', 'MMR', 'JL', 'BSL', 'ET', 'BPL', 'BINA', 'VGLJ', 'GWL', 'AGC', 'MTJ', 'NDLS', 'PNP', 'UMB', 'LDH', 'JUC', 'PTKC', 'JAT'],
+  },
+  {
+    trainNumber: '11078',
+    trainName: 'JHELUM EXPRESS',
+    fromCode: 'JAT',
+    fromName: 'JAMMU TAWI',
+    toCode: 'PUNE',
+    toName: 'PUNE JN',
+    departureTime: '23:40',
+    arrivalTime: '14:35',
+    duration: '38h 55m',
+    runsOn: DAILY,
+    classes: ['SL', '3E', '3A', '2A'],
+    trainType: 'Express',
+    routeStops: ['JAT', 'PTKC', 'JUC', 'LDH', 'UMB', 'PNP', 'NDLS', 'MTJ', 'AGC', 'GWL', 'VGLJ', 'BINA', 'BPL', 'ET', 'BSL', 'JL', 'MMR', 'PUNE'],
+  },
 ];
+
+function hashRouteString(input: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function formatClock(totalMinutes: number): string {
+  const normalized = ((Math.round(totalMinutes) % 1440) + 1440) % 1440;
+  const hh = Math.floor(normalized / 60);
+  const mm = normalized % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+/**
+ * Generates realistic, deterministic All-India Indian Railways trains for any
+ * From–To station pair in India when fewer than 3 curated schedules exist.
+ */
+function generateAllIndiaRouteTrains(
+  from: Station,
+  to: Station,
+  distanceKm: number,
+  existingNumbers: Set<string>,
+  neededCount: number
+): TrainSchedule[] {
+  const seed = hashRouteString(`${from.code}->${to.code}`);
+  const fromCityUpper = from.city.toUpperCase();
+  const toCityUpper = to.city.toUpperCase();
+  const isShortIntercity = distanceKm < 380;
+
+  const templates: Array<{
+    prefix: string;
+    nameSuffix: string;
+    trainType: string;
+    avgSpeedKmph: number;
+    depBaseMin: number;
+    runsOn: WeekFlags;
+    classes: SelectableClassCode[];
+  }> = isShortIntercity
+    ? [
+        {
+          prefix: '12',
+          nameSuffix: 'INTERCITY SF EXPRESS',
+          trainType: 'Superfast Express',
+          avgSpeedKmph: 66,
+          depBaseMin: 6 * 60 + 15,
+          runsOn: DAILY,
+          classes: ['2S', 'CC', 'SL', '3E', '3A'],
+        },
+        {
+          prefix: '22',
+          nameSuffix: 'JAN SHATABDI / SF EXPRESS',
+          trainType: 'Superfast Express',
+          avgSpeedKmph: 70,
+          depBaseMin: 14 * 60 + 20,
+          runsOn: [true, true, true, true, true, true, false],
+          classes: ['2S', 'CC', '3E', '3A', '2A'],
+        },
+        {
+          prefix: '19',
+          nameSuffix: 'OVERNIGHT EXPRESS',
+          trainType: 'Mail / Express',
+          avgSpeedKmph: 54,
+          depBaseMin: 21 * 60 + 40,
+          runsOn: DAILY,
+          classes: ['SL', '3E', '3A', '2A', '1A'],
+        },
+      ]
+    : [
+        {
+          prefix: '12',
+          nameSuffix: 'SUPERFAST EXPRESS',
+          trainType: 'Superfast Express',
+          avgSpeedKmph: 62,
+          depBaseMin: 18 * 60 + 30,
+          runsOn: DAILY,
+          classes: ['SL', '3E', '3A', '2A', '1A'],
+        },
+        {
+          prefix: '22',
+          nameSuffix: 'HUMSAFAR / SF EXPRESS',
+          trainType: 'Superfast Express',
+          avgSpeedKmph: 66,
+          depBaseMin: 7 * 60 + 45,
+          runsOn: [true, false, true, false, true, true, false],
+          classes: ['SL', '3E', '3A', '2A', '1A'],
+        },
+        {
+          prefix: '15',
+          nameSuffix: 'MAIL / EXPRESS',
+          trainType: 'Mail / Express',
+          avgSpeedKmph: 53,
+          depBaseMin: 22 * 60 + 10,
+          runsOn: DAILY,
+          classes: ['SL', '3E', '3A', '2A', '1A'],
+        },
+        {
+          prefix: '20',
+          nameSuffix: 'AC SUPERFAST EXPRESS',
+          trainType: 'Duronto Express',
+          avgSpeedKmph: 74,
+          depBaseMin: 15 * 60 + 50,
+          runsOn: [false, true, false, true, false, false, true],
+          classes: ['3E', '3A', '2A', '1A'],
+        },
+      ];
+
+  const generated: TrainSchedule[] = [];
+  for (let i = 0; i < templates.length && generated.length < neededCount; i += 1) {
+    const tpl = templates[i];
+    const numSuffix = String(100 + ((seed + i * 137) % 890)).padStart(3, '0');
+    const trainNumber = `${tpl.prefix}${numSuffix}`;
+    if (existingNumbers.has(trainNumber)) continue;
+    existingNumbers.add(trainNumber);
+
+    const depOffset = ((seed >> (i * 3)) % 11) * 10; // 0..100 min shift
+    const depMinutes = tpl.depBaseMin + depOffset;
+    const travelMinutes = Math.max(
+      75,
+      Math.round((distanceKm / tpl.avgSpeedKmph) * 60 / 5) * 5
+    );
+    const arrMinutes = depMinutes + travelMinutes;
+
+    generated.push({
+      trainNumber,
+      trainName: `${fromCityUpper} - ${toCityUpper} ${tpl.nameSuffix}`,
+      fromCode: from.code,
+      fromName: from.name,
+      toCode: to.code,
+      toName: to.name,
+      departureTime: formatClock(depMinutes),
+      arrivalTime: formatClock(arrMinutes),
+      duration: formatDurationFromMinutes(travelMinutes),
+      runsOn: tpl.runsOn,
+      classes: tpl.classes,
+      trainType: tpl.trainType,
+      distanceKm,
+      routeStops: [from.code, to.code],
+      isSimulatedSchedule: true,
+    });
+  }
+
+  return generated;
+}
 
 export function buildCustomRouteTrain(
   from: Station,
   to: Station,
+  distanceKm: number,
   hasDirectMatches: boolean
 ): TrainSchedule {
   return {
     trainNumber: 'CUSTOM',
     trainName: hasDirectMatches
-      ? 'Custom / Any Other Available Train on This Route'
-      : 'Multiple Express / Passenger Trains Available on This Route — Submit Your Preferred Time & Train Name (Optional) to Request Booking',
+      ? 'Request Any Other Specific Train Number on This Route'
+      : 'Request Any Specific Express / Special Train on This Route',
     fromCode: from.code,
     fromName: from.name,
     toCode: to.code,
     toName: to.name,
     departureTime: 'Flexible',
     arrivalTime: 'Agent Verified',
-    duration: 'All-India Network',
+    duration: `${distanceKm.toLocaleString('en-IN')} km`,
     runsOn: DAILY,
-    classes: ['SL', '3A', '3E', '2A', '1A', 'CC', '2S'],
-    trainType: hasDirectMatches ? 'All-India Agent Booking' : 'Express & Passenger Desk',
+    classes: ['SL', '3E', '3A', '2A', '1A', 'CC', '2S'],
+    trainType: 'All-India Custom Train Request',
+    distanceKm,
     isCustomOption: true,
   };
 }
@@ -1453,6 +2210,7 @@ export function findTrainsForRoute(
   to: Station,
   selectedClass: TravelClassCode
 ): TrainSchedule[] {
+  const distanceKm = calculateRailwayDistanceKm(from, to);
   const scoredMatches: Array<{ train: TrainSchedule; score: number }> = [];
 
   for (const train of TRAIN_SCHEDULES) {
@@ -1474,13 +2232,13 @@ export function findTrainsForRoute(
     if (fromHit.idx !== -1 && toHit.idx !== -1 && fromHit.idx < toHit.idx) {
       let score = 0;
       if (train.fromCode === from.code && train.toCode === to.code) {
-        score += 100; // Exact origin & destination match
+        score += 100;
       } else if (fromHit.exact && toHit.exact) {
-        score += 80; // Exact intermediate stop passing train (e.g., BWN -> CSMT, KYN -> HWH)
+        score += 80;
       } else if (fromHit.exact || toHit.exact) {
-        score += 55; // One exact station + neighboring city terminal hub
+        score += 55;
       } else {
-        score += 35; // City-hub pair (e.g., SHM <-> LTT when searching HWH <-> CSMT)
+        score += 35;
       }
 
       const isPassingIntermediate =
@@ -1490,6 +2248,7 @@ export function findTrainsForRoute(
       scoredMatches.push({
         train: {
           ...train,
+          distanceKm,
           matchedNote: isPassingIntermediate
             ? `Stops at ${from.code} → ${to.code} (Full route: ${train.fromCode}–${train.toCode})`
             : undefined,
@@ -1499,12 +2258,13 @@ export function findTrainsForRoute(
       continue;
     }
 
-    // Smart West Bengal feeder support (e.g., Barddhaman BWN / Memari MYM searching Mumbai/Pune/Gujarat/South)
+    // Smart West Bengal feeder support (e.g., Barddhaman BWN / Memari MYM searching long-distance routes)
     if (WB_HOWRAH_FEEDERS.has(from.code) && KOLKATA_HUBS.has(train.fromCode)) {
       if (toHit.idx !== -1) {
         scoredMatches.push({
           train: {
             ...train,
+            distanceKm,
             matchedNote: `Boards from nearby hub ${train.fromName} (${train.fromCode})`,
           },
           score: 20,
@@ -1515,6 +2275,7 @@ export function findTrainsForRoute(
         scoredMatches.push({
           train: {
             ...train,
+            distanceKm,
             matchedNote: `Arrives at nearby hub ${train.toName} (${train.toCode})`,
           },
           score: 20,
@@ -1534,5 +2295,21 @@ export function findTrainsForRoute(
     }
   }
 
-  return [...uniqueMatches, buildCustomRouteTrain(from, to, uniqueMatches.length > 0)];
+  // Ensure ANY Indian Railways route across all 185+ stations shows at least 3 realistic trains
+  if (uniqueMatches.length < 3) {
+    const simulated = generateAllIndiaRouteTrains(
+      from,
+      to,
+      distanceKm,
+      seen,
+      3 - uniqueMatches.length
+    ).filter(
+      (tr) =>
+        selectedClass === 'ALL' ||
+        tr.classes.includes(selectedClass as SelectableClassCode)
+    );
+    uniqueMatches.push(...simulated);
+  }
+
+  return [...uniqueMatches, buildCustomRouteTrain(from, to, distanceKm, uniqueMatches.length > 0)];
 }

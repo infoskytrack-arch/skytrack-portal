@@ -1,0 +1,493 @@
+{
+  "entities": {
+    "BookingRequest": {
+      "title": "BookingRequest",
+      "description": "Full customer railway, flight, or bus booking request submitted via SKY TRACK portal. Contains customer PII and is strictly Admin-read/update/delete only.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "referenceId": {
+          "type": "string",
+          "maxLength": 32,
+          "pattern": "^ST-[0-9]{8}-[A-Z0-9]{4}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Firestore serverTimestamp set on create (immutable)."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Firestore serverTimestamp updated on every write."
+        },
+        "createdAtIso": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "updatedAtIso": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "serviceType": {
+          "type": "string",
+          "enum": ["train", "flight", "bus"]
+        },
+        "trainNumber": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "trainName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "fromStation": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "toStation": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "boardingStation": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "journeyDate": {
+          "type": "string",
+          "maxLength": 20,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "returnDate": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "travelClass": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "quota": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "extraPreferences": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "allowAlternateTrain": {
+          "type": "boolean"
+        },
+        "allowClassUpgrade": {
+          "type": "boolean"
+        },
+        "isAdvanceOpeningPriority": {
+          "type": "boolean"
+        },
+        "referredBy": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "advancePaymentChoice": {
+          "type": "string",
+          "enum": ["advance-token", "pay-after-confirmation"]
+        },
+        "advanceTokenAmount": {
+          "type": "number"
+        },
+        "paymentProofMethod": {
+          "type": "string",
+          "enum": ["screenshot", "utr", "whatsapp-chat", ""]
+        },
+        "hasPaymentScreenshot": {
+          "type": "boolean"
+        },
+        "paymentScreenshotOriginalName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "paymentScreenshotUrl": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "passengers": {
+          "type": "array",
+          "description": "Bounded list of 1 to 6 passenger objects."
+        },
+        "mobile": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[6-9][0-9]{9}$"
+        },
+        "alternatePhone": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "paymentReference": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "deliveryChannel": {
+          "type": "string",
+          "enum": ["whatsapp", "email", "admin-direct"]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Pending Verification",
+            "Fare Confirmed",
+            "Ticket Issued",
+            "Cancelled"
+          ]
+        },
+        "pnrNumber": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "agentRemark": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "hasTicketPdf": {
+          "type": "boolean"
+        },
+        "pdfOriginalName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "ticketPdfUrl": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "ticketPdfStorage": {
+          "type": "string",
+          "enum": ["storage", "firestore", "none"]
+        }
+      },
+      "required": [
+        "id",
+        "referenceId",
+        "createdAt",
+        "updatedAt",
+        "createdAtIso",
+        "updatedAtIso",
+        "serviceType",
+        "trainNumber",
+        "trainName",
+        "fromStation",
+        "toStation",
+        "boardingStation",
+        "journeyDate",
+        "travelClass",
+        "quota",
+        "advancePaymentChoice",
+        "advanceTokenAmount",
+        "passengers",
+        "mobile",
+        "deliveryChannel",
+        "status",
+        "hasTicketPdf"
+      ]
+    },
+    "TicketLookup": {
+      "title": "TicketLookup",
+      "description": "Publicly gettable (by exact 10-digit mobile doc ID only, never listable) summary of confirmed/tracked tickets for a customer mobile number.",
+      "type": "object",
+      "properties": {
+        "mobile": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[6-9][0-9]{9}$"
+        },
+        "tickets": {
+          "type": "array",
+          "description": "Bounded list (max 25) of customer-safe ticket status & download entries."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["mobile", "tickets", "updatedAt"]
+    },
+    "TicketRefLookup": {
+      "title": "TicketRefLookup",
+      "description": "Single-document lookup by exact Booking Reference ID (ST-YYYYMMDD-XXXX) for customer tracking without public collection listing.",
+      "type": "object",
+      "properties": {
+        "referenceId": {
+          "type": "string",
+          "maxLength": 32,
+          "pattern": "^ST-[0-9]{8}-[A-Z0-9]{4}$"
+        },
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "mobile": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[6-9][0-9]{9}$"
+        },
+        "trainNumber": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "trainName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "fromStation": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "toStation": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "journeyDate": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "travelClass": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "quota": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "passengerSummary": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Pending Verification",
+            "Fare Confirmed",
+            "Ticket Issued",
+            "Cancelled"
+          ]
+        },
+        "pnrNumber": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "agentRemark": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "hasTicketPdf": {
+          "type": "boolean"
+        },
+        "pdfOriginalName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "ticketPdfUrl": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "ticketPdfStorage": {
+          "type": "string",
+          "enum": ["storage", "firestore", "none"]
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "referenceId",
+        "id",
+        "mobile",
+        "trainNumber",
+        "trainName",
+        "fromStation",
+        "toStation",
+        "journeyDate",
+        "travelClass",
+        "quota",
+        "passengerSummary",
+        "status",
+        "hasTicketPdf",
+        "updatedAt"
+      ]
+    },
+    "TicketPdfBlob": {
+      "title": "TicketPdfBlob",
+      "description": "Fallback Firestore-stored confirmed ticket PDF payload (when Firebase Storage bucket is unavailable on Spark tier), keyed by bookingId.",
+      "type": "object",
+      "properties": {
+        "bookingId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "referenceId": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "mobile": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[6-9][0-9]{9}$"
+        },
+        "pdfOriginalName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "pdfDataUrl": {
+          "type": "string",
+          "maxLength": 950000
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "bookingId",
+        "referenceId",
+        "mobile",
+        "pdfOriginalName",
+        "pdfDataUrl",
+        "updatedAt"
+      ]
+    },
+    "PaymentProofBlob": {
+      "title": "PaymentProofBlob",
+      "description": "Customer-uploaded compressed payment screenshot stored for Admin verification only (never publicly readable).",
+      "type": "object",
+      "properties": {
+        "bookingId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "referenceId": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "originalName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "imageDataUrl": {
+          "type": "string",
+          "maxLength": 500000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "bookingId",
+        "referenceId",
+        "originalName",
+        "imageDataUrl",
+        "createdAt"
+      ]
+    },
+    "AdminConsoleConfig": {
+      "title": "AdminConsoleConfig",
+      "description": "Admin-only console lock credentials (salted SHA-256 hash of Admin ID & password), synced across devices.",
+      "type": "object",
+      "properties": {
+        "adminId": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\.\\-]+$"
+        },
+        "passwordSalt": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "passwordHash": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "updatedByUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "adminId",
+        "passwordSalt",
+        "passwordHash",
+        "updatedByUid",
+        "updatedAt"
+      ]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized staff admin UID allowlist document.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "addedByUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "addedByUid", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/BookingRequest" },
+      "description": "Full booking requests submitted by customers or created directly by admin. Admin-only read/update/delete; public create with strict validation."
+    },
+    "/ticketLookups/{mobile}": {
+      "schema": { "$ref": "#/entities/TicketLookup" },
+      "description": "Per-mobile customer ticket status and confirmed PDF links. Exact-ID single-document get allowed for customers; admin-only write and list."
+    },
+    "/ticketByRef/{referenceId}": {
+      "schema": { "$ref": "#/entities/TicketRefLookup" },
+      "description": "Single-document ticket lookup by exact ST-... Reference ID. Exact-ID get allowed; admin-only write and list."
+    },
+    "/ticketPdfs/{bookingId}": {
+      "schema": { "$ref": "#/entities/TicketPdfBlob" },
+      "description": "Fallback Firestore PDF payload for confirmed tickets when Firebase Storage is not enabled. Exact-ID get allowed; admin-only write and list."
+    },
+    "/paymentProofs/{bookingId}": {
+      "schema": { "$ref": "#/entities/PaymentProofBlob" },
+      "description": "Customer-uploaded advance payment screenshots. Public create allowed with strict size/prefix checks; strictly admin-only read and delete."
+    },
+    "/adminConfig/{configId}": {
+      "schema": { "$ref": "#/entities/AdminConsoleConfig" },
+      "description": "Admin console secondary ID/password hash settings. Strictly admin-only read and write."
+    },
+    "/admins/{uid}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Authorized staff admin accounts. Admin-only management."
+    }
+  }
+}
