@@ -13,6 +13,10 @@ import {
 } from 'lucide-react';
 import { AGENCY_CONTACT, type BookingRequestRecord } from '../types';
 import { formatReadableDate } from '../utils/bookingFormat';
+import {
+  downloadLocalTicketPdf,
+  trackLocalBookingRequests,
+} from '../utils/localBookingStore';
 
 interface TrackTicketViewProps {
   initialMobile?: string;
@@ -30,7 +34,7 @@ export function TrackTicketView({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  async function runLookup(rawQuery: string) {
+  function runLookup(rawQuery: string) {
     const cleaned = rawQuery.trim();
     if (!cleaned) {
       setError('Please enter your 10-digit mobile number or Booking Reference ID.');
@@ -40,31 +44,22 @@ export function TrackTicketView({
     setError('');
     setLoading(true);
     try {
-      const digitsOnly = cleaned.replace(/\D/g, '');
-      const isRef = cleaned.toUpperCase().startsWith('ST-');
-      const params = new URLSearchParams();
-      if (isRef) {
-        params.set('ref', cleaned.toUpperCase());
-      } else {
-        params.set('mobile', digitsOnly.slice(-10));
-      }
-
-      const res = await fetch(`/api/requests/track?${params.toString()}`);
-      const data = (await res.json()) as {
-        requests?: BookingRequestRecord[];
-        error?: string;
-      };
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Could not retrieve booking requests.');
-      }
-
-      setResults(data.requests ?? []);
+      const matched = trackLocalBookingRequests(cleaned);
+      setResults(matched);
     } catch (err) {
       setResults(null);
       setError(err instanceof Error ? err.message : 'Unable to search right now.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  function handleDownloadPdf(rec: BookingRequestRecord) {
+    setError('');
+    try {
+      downloadLocalTicketPdf(rec);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to download ticket PDF.');
     }
   }
 
@@ -214,7 +209,6 @@ export function TrackTicketView({
 
               {results.map((rec) => {
                 const statusUi = getStatusVisual(rec.status);
-                const downloadUrl = `/api/tickets/${encodeURIComponent(rec.id)}/download?mobile=${encodeURIComponent(rec.mobile)}`;
 
                 return (
                   <article
@@ -280,14 +274,14 @@ export function TrackTicketView({
 
                       <div className="shrink-0 flex flex-wrap items-center gap-2.5">
                         {rec.hasTicketPdf ? (
-                          <a
-                            href={downloadUrl}
-                            download={`SKYTRACK-${rec.referenceId}.pdf`}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold rounded-md transition-colors whitespace-nowrap"
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadPdf(rec)}
+                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold rounded-md transition-colors whitespace-nowrap cursor-pointer"
                           >
                             <Download className="w-4 h-4" />
                             <span>Download Ticket PDF</span>
-                          </a>
+                          </button>
                         ) : (
                           <a
                             href={`https://wa.me/${AGENCY_CONTACT.primaryPhoneRaw}?text=${encodeURIComponent(

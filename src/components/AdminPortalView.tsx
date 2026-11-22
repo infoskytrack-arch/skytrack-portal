@@ -25,6 +25,19 @@ import {
   formatReadableDate,
   getTomorrowIsoDate,
 } from '../utils/bookingFormat';
+import {
+  createDirectLocalTicket,
+  deleteLocalBookingRequest,
+  downloadLocalTicketPdf,
+  getAllLocalBookingRequests,
+  getLocalPaymentScreenshot,
+  isLocalAdminConfigured,
+  readFileAsDataUrl,
+  resetLocalAdminPassword,
+  setupLocalAdminPassword,
+  updateLocalBookingRequest,
+  verifyLocalAdminPassword,
+} from '../utils/localBookingStore';
 
 const STATUS_OPTIONS: RequestStatus[] = [
   'Pending Verification',
@@ -33,27 +46,13 @@ const STATUS_OPTIONS: RequestStatus[] = [
   'Cancelled',
 ];
 
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : '';
-      const base64 = result.includes(',') ? result.split(',').pop() || '' : result;
-      resolve(base64);
-    };
-    reader.onerror = () => reject(new Error('Failed to read selected PDF file.'));
-    reader.readAsDataURL(file);
-  });
-}
-
 export function AdminPortalView() {
-  // Token kept strictly in React memory (never persisted to localStorage)
-  const [adminToken, setAdminToken] = useState<string | null>(null);
+  // Unlocked state kept strictly in React memory for the current tab session
+  const [isSignedIn, setIsSignedIn] = useState(false);
   const [authStatus, setAuthStatus] = useState<{
     loaded: boolean;
     configured: boolean;
-    mode: 'env' | 'claimed' | 'unconfigured';
-  }>({ loaded: false, configured: true, mode: 'unconfigured' });
+  }>(() => ({ loaded: true, configured: isLocalAdminConfigured() }));
 
   const [passwordInput, setPasswordInput] = useState('');
   const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
@@ -101,32 +100,11 @@ export function AdminPortalView() {
   const [directFile, setDirectFile] = useState<File | null>(null);
   const [submittingDirect, setSubmittingDirect] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/admin/status')
-      .then((res) => res.json())
-      .then((data: { configured: boolean; mode: 'env' | 'claimed' | 'unconfigured' }) => {
-        setAuthStatus({ loaded: true, configured: data.configured, mode: data.mode });
-      })
-      .catch(() => {
-        setAuthStatus({ loaded: true, configured: true, mode: 'env' });
-      });
-  }, []);
-
-  const fetchRequests = useCallback(async (token: string) => {
+  const loadLocalRequests = useCallback(() => {
     setLoadingList(true);
     setActionError('');
     try {
-      const res = await fetch('/api/admin/requests', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 401) {
-        setAdminToken(null);
-        setAuthError('Session expired. Please sign in again.');
-        return;
-      }
-      const data = (await res.json()) as { requests?: BookingRequestRecord[]; error?: string };
-      if (!res.ok) throw new Error(data.error || 'Could not fetch booking requests.');
-      const items = data.requests ?? [];
+      const items = getAllLocalBookingRequests();
       setRequests(items);
       const nextDrafts: Record<
         string,
@@ -148,10 +126,10 @@ export function AdminPortalView() {
   }, []);
 
   useEffect(() => {
-    if (adminToken) {
-      fetchRequests(adminToken);
+    if (isSignedIn) {
+      loadLocalRequests();
     }
-  }, [adminToken, fetchRequests]);
+  }, [isSignedIn, loadLocalRequests]);
 
   async function handleAuthSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -175,22 +153,17 @@ export function AdminPortalView() {
 
     setAuthLoading(true);
     try {
-      const endpoint = authStatus.configured ? '/api/admin/login' : '/api/admin/setup';
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pwd }),
-      });
-      const data = (await res.json()) as { token?: string; error?: string };
-      if (!res.ok || !data.token) {
-        throw new Error(data.error || 'Authentication failed.');
+      if (!authStatus.configured) {
+        await setupLocalAdminPassword(pwd);
+        setAuthStatus({ loaded: true, configured: true });
+        setIsSignedIn(true);
+      } else {
+        const ok = await verifyLocalAdminPassword(pwd);
+        if (!ok) {
+          throw new Error('Incorrect admin password.');
+        }
+        setIsSignedIn(true);
       }
-      setAdminToken(data.token);
-      setAuthStatus((prev) => ({
-        ...prev,
-        configured: true,
-        mode: prev.mode === 'unconfigured' ? 'claimed' : prev.mode,
-      }));
       setPasswordInput('');
       setConfirmPasswordInput('');
     } catch (err) {
@@ -200,56 +173,56 @@ export function AdminPortalView() {
     }
   }
 
+  function handleResetLocalPassword() {
+    resetLocalAdminPassword();
+    setAuthStatus({ loaded: true, configured: false });
+    setPasswordInput('');
+    setConfirmPasswordInput('');
+    setAuthError('');
+  }
+
   async function handleRowSave(recId: string, pdfFile?: File) {
-    if (!adminToken) return;
+    if (!isSignedIn) return;
     setSavingRowId(recId);
     setActionError('');
     setFeedbackMsg('');
     try {
       const draft = draftEdits[recId];
-      const payload: Record<string, unknown> = {
-        status: draft?.status,
-        pnrNumber: draft?.pnrNumber ?? '',
-        agentRemark: draft?.agentRemark ?? '',
-      };
+      let pdfDataUrl: string | undefined;
+      let pdfOriginalName: string | undefined;
 
       if (pdfFile) {
         if (pdfFile.type !== 'application/pdf' && !pdfFile.name.toLowerCase().endsWith('.pdf')) {
           throw new Error('Only PDF files (.pdf) can be uploaded as tickets.');
         }
-        if (pdfFile.size > 5 * 1024 * 1024) {
-          throw new Error('Ticket PDF must be under 5 MB.');
+        if (pdfFile.size > 3 * 1024 * 1024) {
+          throw new Error('Ticket PDF must be under 3 MB for local browser storage.');
         }
-        payload.pdfBase64 = await fileToBase64(pdfFile);
-        payload.pdfOriginalName = pdfFile.name;
+        pdfDataUrl = await readFileAsDataUrl(pdfFile);
+        pdfOriginalName = pdfFile.name;
       }
 
-      const res = await fetch(`/api/admin/requests/${encodeURIComponent(recId)}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminToken}`,
-        },
-        body: JSON.stringify(payload),
+      const updated = updateLocalBookingRequest(recId, {
+        status: draft?.status,
+        pnrNumber: draft?.pnrNumber ?? '',
+        agentRemark: draft?.agentRemark ?? '',
+        pdfDataUrl,
+        pdfOriginalName,
       });
-      const data = (await res.json()) as { request?: BookingRequestRecord; error?: string };
-      if (!res.ok || !data.request) {
-        throw new Error(data.error || 'Could not update booking record.');
-      }
 
-      setRequests((prev) => prev.map((r) => (r.id === recId ? data.request! : r)));
+      setRequests((prev) => prev.map((r) => (r.id === recId ? updated : r)));
       setDraftEdits((prev) => ({
         ...prev,
         [recId]: {
-          status: data.request!.status,
-          pnrNumber: data.request!.pnrNumber || '',
-          agentRemark: data.request!.agentRemark || '',
+          status: updated.status,
+          pnrNumber: updated.pnrNumber || '',
+          agentRemark: updated.agentRemark || '',
         },
       }));
       setFeedbackMsg(
         pdfFile
-          ? `Confirmed ticket PDF uploaded for ${data.request.referenceId}. Customer can now download it via mobile ${data.request.mobile}.`
-          : `Updated booking ${data.request.referenceId}.`
+          ? `Confirmed ticket PDF saved for ${updated.referenceId}. Customer can now download it via mobile ${updated.mobile}.`
+          : `Updated booking ${updated.referenceId}.`
       );
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Update failed.');
@@ -260,7 +233,7 @@ export function AdminPortalView() {
 
   async function handleDirectTicketSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!adminToken) return;
+    if (!isSignedIn) return;
     setActionError('');
     setFeedbackMsg('');
 
@@ -273,48 +246,37 @@ export function AdminPortalView() {
       setActionError('Please select the confirmed ticket PDF file to upload.');
       return;
     }
-    if (directFile.size > 5 * 1024 * 1024) {
-      setActionError('Ticket PDF must be under 5 MB.');
+    if (directFile.size > 3 * 1024 * 1024) {
+      setActionError('Ticket PDF must be under 3 MB for local browser storage.');
       return;
     }
 
     setSubmittingDirect(true);
     try {
-      const pdfBase64 = await fileToBase64(directFile);
-      const res = await fetch('/api/admin/tickets', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminToken}`,
-        },
-        body: JSON.stringify({
-          mobile: cleanedMobile,
-          passengerName: directPassenger.trim(),
-          fromStation: directFrom.trim(),
-          toStation: directTo.trim(),
-          journeyDate: directDate,
-          trainNumber: directTrainNumber.trim() || 'CONFIRMED',
-          trainName: directTrainName.trim() || 'Indian Railways Express',
-          travelClass: directClass,
-          quota: directQuota,
-          pnrNumber: directPnr.trim(),
-          agentRemark: directRemark.trim(),
-          pdfBase64,
-          pdfOriginalName: directFile.name,
-        }),
+      const pdfDataUrl = await readFileAsDataUrl(directFile);
+      const created = createDirectLocalTicket({
+        mobile: cleanedMobile,
+        passengerName: directPassenger.trim(),
+        fromStation: directFrom.trim(),
+        toStation: directTo.trim(),
+        journeyDate: directDate,
+        trainNumber: directTrainNumber.trim() || 'CONFIRMED',
+        trainName: directTrainName.trim() || 'Indian Railways Express',
+        travelClass: directClass,
+        quota: directQuota,
+        pnrNumber: directPnr.trim(),
+        agentRemark: directRemark.trim(),
+        pdfDataUrl,
+        pdfOriginalName: directFile.name,
       });
-      const data = (await res.json()) as { request?: BookingRequestRecord; error?: string };
-      if (!res.ok || !data.request) {
-        throw new Error(data.error || 'Could not upload ticket.');
-      }
 
-      setRequests((prev) => [data.request!, ...prev]);
+      setRequests((prev) => [created, ...prev]);
       setDraftEdits((prev) => ({
         ...prev,
-        [data.request!.id]: {
-          status: data.request!.status,
-          pnrNumber: data.request!.pnrNumber || '',
-          agentRemark: data.request!.agentRemark || '',
+        [created.id]: {
+          status: created.status,
+          pnrNumber: created.pnrNumber || '',
+          agentRemark: created.agentRemark || '',
         },
       }));
       setShowDirectForm(false);
@@ -326,7 +288,7 @@ export function AdminPortalView() {
       setDirectRemark('');
       setDirectFile(null);
       setFeedbackMsg(
-        `Ticket PDF uploaded! Customer can now download it using mobile ${data.request.mobile} (Ref: ${data.request.referenceId}).`
+        `Ticket PDF saved! Customer can now download it using mobile ${created.mobile} (Ref: ${created.referenceId}).`
       );
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Upload failed.');
@@ -335,73 +297,54 @@ export function AdminPortalView() {
     }
   }
 
-  async function handleDelete(recId: string, refId: string) {
-    if (!adminToken) return;
+  function handleDelete(recId: string, refId: string) {
+    if (!isSignedIn) return;
     setActionError('');
     try {
-      const res = await fetch(`/api/admin/requests/${encodeURIComponent(recId)}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      if (!res.ok) throw new Error('Could not delete record.');
+      deleteLocalBookingRequest(recId);
       setRequests((prev) => prev.filter((r) => r.id !== recId));
+      if (proofPreview?.requestId === recId) {
+        setProofPreview(null);
+      }
       setFeedbackMsg(`Removed booking record ${refId}.`);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Delete failed.');
     }
   }
 
-  async function handleAdminDownloadPdf(rec: BookingRequestRecord) {
-    if (!adminToken) return;
+  function handleAdminDownloadPdf(rec: BookingRequestRecord) {
+    if (!isSignedIn) return;
+    setActionError('');
     try {
-      const res = await fetch(`/api/tickets/${encodeURIComponent(rec.id)}/download`, {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      if (!res.ok) throw new Error('Could not download PDF.');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `SKYTRACK-${rec.referenceId}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      downloadLocalTicketPdf(rec);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Download failed.');
     }
   }
 
-  async function handleViewPaymentScreenshot(rec: BookingRequestRecord) {
-    if (!adminToken) return;
+  function handleViewPaymentScreenshot(rec: BookingRequestRecord) {
+    if (!isSignedIn) return;
     setActionError('');
-    try {
-      const res = await fetch(`/api/admin/requests/${encodeURIComponent(rec.id)}/proof`, {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      if (!res.ok) {
-        throw new Error('Could not load uploaded payment screenshot.');
-      }
-      const blob = await res.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      setProofPreview((prev) => {
-        if (prev) URL.revokeObjectURL(prev.objectUrl);
-        return { requestId: rec.id, referenceId: rec.referenceId, objectUrl };
-      });
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Unable to view payment screenshot.');
+    const dataUrl = getLocalPaymentScreenshot(rec.id);
+    if (!dataUrl) {
+      setActionError(
+        'Payment screenshot is not stored in this browser (customer may have submitted from another device or shared it on WhatsApp).'
+      );
+      return;
     }
-  }
-
-  function closeProofPreview() {
-    setProofPreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev.objectUrl);
-      return null;
+    setProofPreview({
+      requestId: rec.id,
+      referenceId: rec.referenceId,
+      objectUrl: dataUrl,
     });
   }
 
+  function closeProofPreview() {
+    setProofPreview(null);
+  }
+
   // Unauthenticated View (First-run Setup OR Standard Login)
-  if (!adminToken) {
+  if (!isSignedIn) {
     return (
       <section className="max-w-md mx-auto px-4 sm:px-6 py-12">
         <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
@@ -483,6 +426,18 @@ export function AdminPortalView() {
                 ? 'Sign In to Admin Portal'
                 : 'Set Password & Sign In'}
             </button>
+
+            {authStatus.configured && (
+              <div className="pt-1 text-center">
+                <button
+                  type="button"
+                  onClick={handleResetLocalPassword}
+                  className="text-xs font-medium text-slate-500 hover:text-[#213D77] underline cursor-pointer"
+                >
+                  Reset Local Admin Password
+                </button>
+              </div>
+            )}
           </form>
         </div>
       </section>
@@ -531,7 +486,7 @@ export function AdminPortalView() {
 
           <button
             type="button"
-            onClick={() => fetchRequests(adminToken)}
+            onClick={() => loadLocalRequests()}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-md transition-colors whitespace-nowrap cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loadingList ? 'animate-spin' : ''}`} />
@@ -541,8 +496,9 @@ export function AdminPortalView() {
           <button
             type="button"
             onClick={() => {
-              setAdminToken(null);
+              setIsSignedIn(false);
               setRequests([]);
+              setProofPreview(null);
             }}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-md transition-colors whitespace-nowrap cursor-pointer"
           >

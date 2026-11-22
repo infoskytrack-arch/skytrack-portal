@@ -48,6 +48,10 @@ import {
 } from '../utils/bookingFormat';
 import { downloadOfficialRequestReceipt } from '../utils/officialReceiptGenerator';
 import {
+  compressImageFileToDataUrl,
+  createLocalBookingRequest,
+} from '../utils/localBookingStore';
+import {
   clearSavedPassengerProfile,
   loadSavedPassengerProfile,
   savePassengerProfile,
@@ -146,7 +150,7 @@ export function BookingFormScreen({
     setBoardingStation(context.defaultBoarding);
   }, [context.defaultBoarding]);
 
-  function handleScreenshotFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleScreenshotFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     setScreenshotError('');
     const file = e.target.files?.[0];
     if (!file) return;
@@ -165,20 +169,17 @@ export function BookingFormScreen({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : '';
-      if (result.startsWith('data:image/')) {
-        setScreenshotDataUrl(result);
-        setScreenshotFileName(file.name);
-      } else {
-        setScreenshotError('Could not read the selected image file. Please try another JPG/PNG.');
-      }
-    };
-    reader.onerror = () => {
-      setScreenshotError('Failed to read image file. Please try again.');
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compactDataUrl = await compressImageFileToDataUrl(file);
+      setScreenshotDataUrl(compactDataUrl);
+      setScreenshotFileName(file.name);
+    } catch (err) {
+      setScreenshotError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to read image file. Please try another JPG/PNG.'
+      );
+    }
   }
 
   function handleClearScreenshot() {
@@ -293,7 +294,7 @@ export function BookingFormScreen({
     return null;
   }
 
-  async function handleSubmit(channel: 'whatsapp' | 'email') {
+  function handleSubmit(channel: 'whatsapp' | 'email') {
     setErrorMessage('');
     const validationErr = validateForm();
     if (validationErr) {
@@ -316,7 +317,8 @@ export function BookingFormScreen({
         email: email.trim() || undefined,
       });
 
-      const payload = {
+      // Save booking request 100% client-side in localStorage (no backend /api calls)
+      const { record } = createLocalBookingRequest({
         serviceType: context.serviceType,
         trainNumber: context.trainNumber,
         trainName: context.trainName,
@@ -345,37 +347,23 @@ export function BookingFormScreen({
         email: email.trim() || undefined,
         paymentReference:
           advanceChoice === 'advance-token' && isUtrValid ? cleanedUtr : undefined,
-        paymentScreenshotBase64:
+        paymentScreenshotDataUrl:
           advanceChoice === 'advance-token' && hasScreenshot ? screenshotDataUrl : undefined,
         paymentScreenshotOriginalName:
           advanceChoice === 'advance-token' && hasScreenshot ? screenshotFileName : undefined,
         willShareProofOnWhatsApp:
           advanceChoice === 'advance-token' ? willShareProofOnWhatsApp : false,
         deliveryChannel: channel,
-      };
-
-      const res = await fetch('/api/requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
       });
 
-      const data = (await res.json()) as {
-        request?: BookingRequestRecord;
-        error?: string;
-      };
-
-      if (!res.ok || !data.request) {
-        throw new Error(data.error || 'Could not submit your booking request. Please try again.');
-      }
-
+      // Launch WhatsApp or Email synchronously inside the click handler so mobile/desktop browsers never block it
       if (channel === 'whatsapp') {
-        launchSafeExternalLink(buildWhatsAppUrl(data.request));
+        launchSafeExternalLink(buildWhatsAppUrl(record));
       } else {
-        launchSafeExternalLink(buildMailtoUrl(data.request));
+        launchSafeExternalLink(buildMailtoUrl(record));
       }
 
-      onSubmitted(data.request);
+      onSubmitted(record);
     } catch (err) {
       setErrorMessage(
         err instanceof Error ? err.message : 'Something went wrong while submitting your request.'
