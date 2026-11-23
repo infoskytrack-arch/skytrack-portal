@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   BookOpen,
   FileDown,
@@ -9,6 +10,7 @@ import {
   MessageCircle,
   Phone,
   TrainFront,
+  X,
 } from 'lucide-react';
 import { TRANSLATIONS } from '../i18n/translations';
 import { AGENCY_CONTACT, type LanguageCode } from '../types';
@@ -34,6 +36,7 @@ export function Header({
   onLanguageChange,
   onSelectNav,
 }: HeaderProps) {
+  const [showBetaBanner, setShowBetaBanner] = useState(true);
   const t = TRANSLATIONS[language];
   const whatsappDirectUrl = `https://wa.me/${AGENCY_CONTACT.primaryPhoneRaw}?text=${encodeURIComponent(
     'Hello SKY TRACK, I would like to inquire about a Train / Flight / Bus ticket booking.'
@@ -117,8 +120,13 @@ export function Header({
             <span className="w-8 h-8 rounded-md bg-[#213D77] text-white flex items-center justify-center shrink-0">
               <TrainFront className="w-4 h-4" />
             </span>
-            <span className="text-base sm:text-lg font-extrabold tracking-tight text-[#213D77]">
-              SKY TRACK
+            <span className="inline-flex items-center gap-1.5">
+              <span className="text-base sm:text-lg font-extrabold tracking-tight text-[#213D77]">
+                SKY TRACK
+              </span>
+              <span className="px-1.5 py-0.5 text-[10px] font-extrabold tracking-wider uppercase leading-none rounded bg-[#FB792B]/12 text-[#E06319] border border-[#FB792B]/35">
+                BETA
+              </span>
             </span>
           </button>
 
@@ -200,6 +208,35 @@ export function Header({
           <span className="ticker-duplicate px-8 whitespace-nowrap">{t.tickerCallLine}</span>
         </div>
       </div>
+
+      {/* Clean Dismissible Public Beta Notice Banner (scrolls naturally, never blocks mobile viewport) */}
+      {showBetaBanner && (
+        <div
+          role="status"
+          aria-label="Public Beta Notice"
+          className="bg-[#F4F7FC] border-b border-slate-200 text-[#213D77]"
+        >
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 py-1.5 flex items-center justify-between gap-3 text-[11px] sm:text-xs">
+            <p className="leading-snug">
+              <span className="font-extrabold text-[#213D77]">Public Beta Version</span>
+              <span className="text-slate-700">
+                {' '}
+                — All train &amp; flight bookings and PDF downloads are 100% live. Full Permanent
+                Version launching February 2027 with more features!
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowBetaBanner(false)}
+              aria-label="Dismiss Public Beta notice"
+              title="Dismiss"
+              className="p-1 rounded text-slate-400 hover:text-[#213D77] hover:bg-slate-200/60 transition-colors shrink-0 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
